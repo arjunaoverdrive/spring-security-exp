@@ -14,6 +14,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
 
 import static org.igor_klimov.security.ApplicationUserPermission.*;
 import static org.igor_klimov.security.ApplicationUserRole.*;
@@ -34,9 +37,8 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()).and()// use for browser-as-a client apps
+//                .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()).and()// use for browser-as-a client apps
                 .csrf().disable()
-
                 .authorizeRequests()
                 .antMatchers("/", "index", "/css/*", "/js/*").permitAll()
                 .antMatchers("/api/**").hasRole(ApplicationUserRole.STUDENT.name())
@@ -48,7 +50,27 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
                 .anyRequest()
                 .authenticated()
                 .and()
-                .httpBasic();
+//                .httpBasic(); // enables basic auth
+                .formLogin() // enables form based auth
+                    .loginPage("/login").permitAll()
+                    .defaultSuccessUrl("/courses", true)
+                    .passwordParameter("password") /*override default names for password
+                    and username fields in html form*/
+                    .usernameParameter("username")
+                .and().rememberMe()//defaults to 2 weeks
+                    .tokenValiditySeconds((int)TimeUnit.DAYS.toSeconds(21))//extends expiration of a remember-me to a custom value
+                    .key("something_very_secured")// key to fetch the cookie
+                    .rememberMeParameter("remember-me-parameter")
+                .and()
+                .logout()
+                    .logoutUrl("/logout")
+                   .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))/*  used when csrf is disabled to use Get request
+                not needed when csrf is disabled; when it's enabled, POST is used to log the user out */
+                    .clearAuthentication(true)
+                    .invalidateHttpSession(true)
+                    .deleteCookies("JSESSIONID", "remember-me")
+                    .logoutSuccessUrl("/login");
+
     }
 
     @Override
