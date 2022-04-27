@@ -1,7 +1,6 @@
-package org.igor_klimov.auth;
+package org.igor_klimov.security.auth;
 
 import com.google.common.collect.Lists;
-import org.igor_klimov.security.ApplicationUserRole;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;

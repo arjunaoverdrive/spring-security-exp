@@ -1,6 +1,9 @@
 package org.igor_klimov.security;
 
-import org.igor_klimov.auth.ApplicationUserService;
+import org.igor_klimov.jwt.JwtConfig;
+import org.igor_klimov.jwt.JwtTokenVerifier;
+import org.igor_klimov.security.auth.ApplicationUserService;
+import org.igor_klimov.jwt.JwtUserNameAndPasswordAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,10 +13,10 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
-import java.util.concurrent.TimeUnit;
+import javax.crypto.SecretKey;
 
 
 @Configuration
@@ -23,11 +26,18 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final PasswordEncoder passwordEncoder;
     private final ApplicationUserService applicationUserService;
+    private final JwtConfig jwtConfig;
+    private final SecretKey secretKey;
 
     @Autowired
-    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder, ApplicationUserService applicationUserService) {
+    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder,
+                                     ApplicationUserService applicationUserService,
+                                     JwtConfig jwtConfig,
+                                     SecretKey secretKey) {
         this.passwordEncoder = passwordEncoder;
         this.applicationUserService = applicationUserService;
+        this.jwtConfig = jwtConfig;
+        this.secretKey = secretKey;
     }
 
     @Override
@@ -35,28 +45,20 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
         http
 
                 .csrf().disable()
+                .sessionManagement()
+                    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .addFilter(new JwtUserNameAndPasswordAuthenticationFilter(authenticationManager(),
+                        jwtConfig,
+                        secretKey)) //WebSecurityConfigurerAdapter defines
+                // the authenticationManager method
+                .addFilterAfter(new JwtTokenVerifier(secretKey, jwtConfig),
+                        JwtUserNameAndPasswordAuthenticationFilter.class) //register the filter
                 .authorizeRequests()
                 .antMatchers("/", "index", "/css/*", "/js/*").permitAll()
                 .antMatchers("/api/**").hasRole(ApplicationUserRole.STUDENT.name())
                 .anyRequest()
-                .authenticated()
-                .and()
-                .formLogin() // enables form based auth
-                    .loginPage("/login").permitAll()
-                    .defaultSuccessUrl("/courses", true)
-                .and().rememberMe()//defaults to 2 weeks
-                    .tokenValiditySeconds((int)TimeUnit.DAYS.toSeconds(21))//extends expiration of a remember-me to a custom value
-                    .key("something_very_secured")// key to fetch the cookie
-                .and()
-                .logout()
-                    .logoutUrl("/logout")
-                   .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))/*  used when csrf is disabled to use Get request
-                not needed when csrf is disabled; when it's enabled, POST is used to log the user out */
-                    .clearAuthentication(true)
-                    .invalidateHttpSession(true)
-                    .deleteCookies("JSESSIONID", "remember-me")
-                    .logoutSuccessUrl("/login");
-
+                .authenticated();
     }
 
 
@@ -70,6 +72,6 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.authenticationProvider(daoAuthenticationProvider());
+        auth.authenticationProvider(daoAuthenticationProvider()); 
     }
 }

@@ -1,4 +1,4 @@
-package org.igor_klimov.auth;
+package org.igor_klimov.security.auth;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
